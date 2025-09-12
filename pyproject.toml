@@ -1,0 +1,70 @@
+[project]
+name = "cosi-consumer-framework"
+version = "0.1.0"
+description = "Illustration of a python framework based on the COSI consumer framework"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.3.3",
+    "pandas>=2.3.2",
+    "sqlmodel>=0.0.24",
+]
+
+[dependency-groups]
+dev = [
+    "coverage>=7.10.6",
+    "ipykernel>=6.30.1",
+    "jupyter>=1.1.1",
+    "mkdocs-material>=9.6.19",
+    "mkdocs>=1.6.1",
+    "mypy>=1.18.1",
+    "notebook>=7.4.5",
+    "openpyxl>=3.1.5",
+    "pandas-stubs>=2.3.2.250827",
+    "pytest>=8.4.2",
+    "mkdocstrings[python]>=0.30.0",
+]
+
+[tool.ruff]
+exclude = [
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".tox",
+    "build",
+    "dist",
+    "__init__.py",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/tests/*",
+    "**/tests/**",
+    "main_dev.py",
+    "cosi_consumer_framework/logging.py", # Exclude logging.py from coverage
+    "main_example.py",     # Exclude main_example.py from coverage
+]
+
+# Add this new section for reporting
+[tool.coverage.report]
+exclude_also = [
+    # Exclude abstract methods
+    "@(abc\\.)?abstractmethod",
+
+    # Exclude lines that are just a 'pass' statement, common in abstract methods
+    "pass",
+
+    # Exclude lines that raise NotImplementedError, also common in interfaces
+    "raise NotImplementedError",
+
+    # You can keep adding other patterns here if needed
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+exclude = [
+    "tests/",
+    "main_dev.py",
+    "main_example.py"
+]
