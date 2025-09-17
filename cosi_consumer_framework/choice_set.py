@@ -1,17 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar, Generic
-
-from .agent import Agent
-from .agent_perception import AgentPerception
-from .asset import Asset
+from typing import Any
+from pydantic import BaseModel
 
 
-_TypeAgent = TypeVar("_TypeAgent", bound=Agent)
-_TypeOption = TypeVar("_TypeOption", bound=Asset)
-_TypeAgentPerception = TypeVar("_TypeAgentPerception", bound=AgentPerception)
-
-
-class ChoiceSet(ABC, Generic[_TypeOption, _TypeAgent, _TypeAgentPerception]):
+class ChoiceSet(BaseModel, ABC):
     """
     A class to represent a choice set for an agent in the COSI ABM. A choice set
     contains a list of option that the agent can choose from and performs their
@@ -37,7 +29,7 @@ class ChoiceSet(ABC, Generic[_TypeOption, _TypeAgent, _TypeAgentPerception]):
 
     @abstractmethod
     def evaluate(self) -> None:
-        """Evluate the available options in the choice set.
+        """Evaluate the available options in the choice set.
 
         This method should be implemented by subclasses to perform the evaluation
         of the options based on the agent's preferences and the environment.

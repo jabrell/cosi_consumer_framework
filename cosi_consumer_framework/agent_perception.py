@@ -55,7 +55,7 @@ class AgentPerception(SQLModel, ABC):
             environment: The environment in which the agent is located.
 
         Returns:
-            Instance of AgentPerception containing the relevant information.
+            Dictionary with the relevant information
         """
         raise NotImplementedError(
             "This method should be implemented in a subclass of AgentPerception."

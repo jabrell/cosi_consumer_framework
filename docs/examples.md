@@ -2,394 +2,202 @@
 
 This guide provides practical examples of how to use the COSI Consumer Framework.
 
-## Example 1: Simple Wealth Transfer Model
+## Basic Usage Example: Temperature-Based Drink Choice
 
-This example demonstrates the basic concepts of the framework through a simple model where agents can transfer wealth between each other.
+This example demonstrates the basic concepts of the framework through a simple model where agents choose drinks based on temperature.
 
-### Step 1: Define Your Agent
+### Step 1: Setup and Imports
 
 ```python
-from cosi_consumer_framework import Agent, AgentPerception, ChoiceSet, Environment
+# Add parent folder to Python path
+import sys
+sys.path.insert(0, "..")
+
 from typing import Any
-import random
+import numpy as np
+from pydantic import Field
 
-class Person(Agent):
-    """A simple agent that represents a person with wealth."""
-    wealth: int = 1  # Starting wealth
-    
-    def perceive(self, environment: Environment) -> "WealthPerception":
-        """Perceive the current state of wealth in the environment."""
-        return WealthPerception.perceive(self, environment)
-    
-    def trigger_choice(self, perception: "WealthPerception") -> "TransferChoiceSet":
-        """Determine if and how much wealth to transfer."""
-        return TransferChoiceSet.trigger(self, perception)
-    
-    def choose(self, options: "TransferChoiceSet", perception: "WealthPerception") -> None:
-        """Make a choice about wealth transfer."""
-        if options.can_transfer and self.wealth > 0:
-            # Find another agent to transfer to
-            target_agent = random.choice(list(perception.other_agents.values()))
-            # Transfer 1 unit of wealth
-            self.wealth -= 1
-            target_agent.wealth += 1
-            print(f"{self.id} transferred 1 wealth to {target_agent.id}")
+from cosi_consumer_framework import (
+    Environment, 
+    Agent, 
+    AgentPerception, 
+    ChoiceSet
+)
 ```
 
-### Step 2: Define Perception
+### Step 2: Define Environment
+
+The environment holds all objective information and coordinates the simulation. Here we create a temperature environment that randomly changes temperature each year:
 
 ```python
-class WealthPerception(AgentPerception):
-    """Represents what an agent perceives about wealth in the environment."""
-    total_wealth: int
-    other_agents: dict[str, Person]
-    transfer_opportunity: bool
+class TemperatureEnvironment(Environment):
+    temperature: float = Field(15.0, description="Current temperature in degrees Celsius")
+
+    def step(self):
+        self.temperature = np.random.randint(0,40)
+        print(f"{self.year}: Environment temperature changed to: {self.temperature}")
+        super().step()
+```
+
+### Step 3: Define Perception
+
+Perception is a two-part process: extracting information from the environment and then distorting it based on agent characteristics:
+
+```python
+class TemperaturePerception(AgentPerception):
+    temperature: float = Field(..., description="Perceived temperature in degrees Celsius")
     
     @classmethod
-    def get_information_from_environment(cls, agent: Person, environment: Environment) -> dict:
-        """Extract wealth information from the environment."""
-        other_agents = {
-            aid: a for aid, a in environment.agents.items() 
-            if aid != agent.id
-        }
-        total_wealth = sum(a.wealth for a in environment.agents.values())
+    def get_information_from_environment(
+            cls, agent: Any, environment: TemperatureEnvironment
+        ) -> dict:
+        """Extract information from the environment.
         
-        # Simple rule: transfer opportunity exists if agent has wealth and others exist
-        transfer_opportunity = len(other_agents) > 0 and agent.wealth > 0
+        Args:
+            agent: The agent that is perceiving the information.
+            environment: The environment in which the agent is located.
+
+        Returns:
+            Dictionary with the relevant information
+        """
+        return {"temperature": environment.temperature}
+    
+    def distort_information(self, agent: Any) -> None:
+        """Distort the perceived information.
         
-        return {
-            "total_wealth": total_wealth,
-            "other_agents": other_agents,
-            "transfer_opportunity": transfer_opportunity
-        }
-    
-    def distort_information(self, agent: Person) -> None:
-        """Add noise to perception (no distortion in this simple example)."""
-        pass
+        Args:
+            agent: The agent that is perceiving the information.
+        """
+        self.temperature += agent.temperature_bias
 ```
 
-### Step 3: Define Choice Set
+### Step 4: Define Choice Set
+
+The choice set is triggered by perception and evaluates available options:
 
 ```python
-class TransferChoiceSet(ChoiceSet):
-    """Represents the choice of whether to transfer wealth."""
-    can_transfer: bool
-    transfer_amount: int = 0
-    
-    @classmethod
-    def trigger(cls, agent: Person, perception: WealthPerception) -> "TransferChoiceSet":
-        """Determine if transfer is possible."""
-        return cls(
-            can_transfer=perception.transfer_opportunity,
-            transfer_amount=1 if perception.transfer_opportunity else 0
-        )
-    
-    def evaluate(self) -> None:
-        """Evaluate the transfer option (simple rule-based)."""
-        # In this simple example, evaluation is already done in trigger
-        pass
-```
-
-### Step 4: Run the Simulation
-
-```python
-# Create environment
-env = Environment(year=2024)
-
-# Create agents
-agents = [Person(id=f"person_{i}") for i in range(5)]
-
-# Add agents to environment
-env.add(agents)
-
-# Print initial state
-print("Initial wealth distribution:")
-for agent_id, agent in env.agents.items():
-    print(f"  {agent_id}: {agent.wealth}")
-
-# Run simulation for 10 steps
-print("\nRunning simulation...")
-for step in range(10):
-    print(f"\nStep {step + 1}:")
-    env.step()
-    
-    # Print current wealth distribution
-    total_wealth = sum(agent.wealth for agent in env.agents.values())
-    print(f"  Total wealth: {total_wealth}")
-    for agent_id, agent in env.agents.items():
-        print(f"  {agent_id}: {agent.wealth}")
-
-# Access simulation reports
-reports = env.reports
-print(f"\nGenerated {len(reports)} report entries")
-```
-
-## Example 2: Housing Market Model
-
-This example shows a more complex model where agents can buy and sell houses.
-
-### Assets: Houses
-
-```python
-from cosi_consumer_framework import Asset
-
-class House(Asset):
-    """Represents a house that can be bought and sold."""
-    price: float
-    size: int  # square meters
-    location: str
-    owner_id: str | None = None
-    
-    @property
-    def is_available(self) -> bool:
-        """Check if house is available for purchase."""
-        return self.owner_id is None
-    
-    def sell_to(self, buyer_id: str) -> None:
-        """Transfer ownership to a buyer."""
-        self.owner_id = buyer_id
-    
-    def report(self) -> dict[str, dict[str, Any]]:
-        """Custom reporting for houses."""
-        report = super().report()
-        report[self.class_name]["is_available"] = self.is_available
-        return report
-```
-
-### Agents: Home Buyers
-
-```python
-class HomeBuyer(Agent):
-    """An agent that can buy houses."""
-    budget: float
-    preferred_size: int
-    current_house_id: str | None = None
-    
-    def perceive(self, environment: Environment) -> "HousingPerception":
-        return HousingPerception.perceive(self, environment)
-    
-    def trigger_choice(self, perception: "HousingPerception") -> "HouseChoiceSet":
-        return HouseChoiceSet.trigger(self, perception)
-    
-    def choose(self, options: "HouseChoiceSet", perception: "HousingPerception") -> None:
-        if options.affordable_houses and self.current_house_id is None:
-            # Choose the house closest to preferred size within budget
-            best_house = min(
-                options.affordable_houses,
-                key=lambda h: abs(h.size - self.preferred_size)
-            )
-            
-            if best_house.price <= self.budget:
-                # Buy the house
-                best_house.sell_to(self.id)
-                self.budget -= best_house.price
-                self.current_house_id = best_house.id
-                print(f"{self.id} bought {best_house.id} for ${best_house.price:,.0f}")
-
-class HousingPerception(AgentPerception):
-    """Perception of the housing market."""
-    available_houses: list[House]
-    average_price: float
-    
-    @classmethod
-    def get_information_from_environment(cls, agent: HomeBuyer, environment: Environment) -> dict:
-        available_houses = [
-            house for house in environment.assets.values()
-            if isinstance(house, House) and house.is_available
-        ]
-        
-        avg_price = (
-            sum(h.price for h in available_houses) / len(available_houses)
-            if available_houses else 0
-        )
-        
-        return {
-            "available_houses": available_houses,
-            "average_price": avg_price
-        }
-    
-    def distort_information(self, agent: HomeBuyer) -> None:
-        """Add some noise to price perception."""
-        noise_factor = random.uniform(0.95, 1.05)
-        self.average_price *= noise_factor
-
-class HouseChoiceSet(ChoiceSet):
-    """Choice set for house purchases."""
-    affordable_houses: list[House]
-    
-    @classmethod
-    def trigger(cls, agent: HomeBuyer, perception: HousingPerception) -> "HouseChoiceSet":
-        affordable = [
-            house for house in perception.available_houses
-            if house.price <= agent.budget
-        ]
-        return cls(affordable_houses=affordable)
-    
-    def evaluate(self) -> None:
-        """Evaluate houses by price and size preference."""
-        # Evaluation logic could be more sophisticated
-        pass
-```
-
-### Running the Housing Market Simulation
-
-```python
-# Create environment
-env = Environment(year=2024)
-
-# Create houses
-houses = [
-    House(id=f"house_{i}", price=200000 + i*50000, size=100 + i*20, location=f"District_{i%3}")
-    for i in range(10)
-]
-
-# Create home buyers
-buyers = [
-    HomeBuyer(
-        id=f"buyer_{i}", 
-        budget=250000 + i*100000, 
-        preferred_size=120 + i*10
+class DrinkChoice(ChoiceSet):
+    options: list[str] = Field(..., description="Available drink options")
+    scores: dict[str, float] = Field(
+        default_factory=dict, 
+        description="Scores for each drink option"
     )
-    for i in range(5)
-]
+    temperature: float = Field(..., description="Perceived temperature in degrees Celsius")
+    agent: Any = Field(..., description="The agent making the choice")
 
-# Add to environment
-env.add(houses + buyers)
-
-# Run simulation
-print("Housing Market Simulation")
-print("=" * 40)
-
-for step in range(5):
-    print(f"\nStep {step + 1}:")
-    env.step()
-    
-    # Show market status
-    available = [h for h in houses if h.is_available]
-    sold = [h for h in houses if not h.is_available]
-    print(f"  Available houses: {len(available)}")
-    print(f"  Sold houses: {len(sold)}")
-```
-
-## Example 3: Energy System Model
-
-This example demonstrates how to model energy production and consumption.
-
-### Energy Assets
-
-```python
-class PowerPlant(Asset):
-    """A power plant that generates electricity."""
-    capacity: float  # MW
-    fuel_type: str
-    efficiency: float
-    current_output: float = 0.0
-    
-    def generate_power(self, demand: float) -> float:
-        """Generate power up to capacity."""
-        self.current_output = min(demand, self.capacity)
-        return self.current_output
-
-class Battery(Asset):
-    """Energy storage system."""
-    capacity: float  # MWh
-    current_charge: float = 0.0
-    charge_rate: float  # MW
-    
-    def charge(self, power: float, hours: float = 1.0) -> float:
-        """Charge the battery and return power actually stored."""
-        max_charge = min(power * hours, self.charge_rate * hours)
-        available_capacity = self.capacity - self.current_charge
-        actual_charge = min(max_charge, available_capacity)
-        self.current_charge += actual_charge
-        return actual_charge
-    
-    def discharge(self, power_needed: float, hours: float = 1.0) -> float:
-        """Discharge the battery and return power provided."""
-        max_discharge = min(power_needed * hours, self.charge_rate * hours)
-        available_power = min(max_discharge, self.current_charge)
-        self.current_charge -= available_power
-        return available_power
-```
-
-### Energy Manager Agent
-
-```python
-class EnergyManager(Agent):
-    """Manages energy production and storage."""
-    total_demand: float = 100.0  # MW
-    
-    def perceive(self, environment: Environment) -> "EnergyPerception":
-        return EnergyPerception.perceive(self, environment)
-    
-    def trigger_choice(self, perception: "EnergyPerception") -> "EnergyChoiceSet":
-        return EnergyChoiceSet.trigger(self, perception)
-    
-    def choose(self, options: "EnergyChoiceSet", perception: "EnergyPerception") -> None:
-        # Simple strategy: use cheapest sources first
-        remaining_demand = self.total_demand
-        
-        # First, try to use stored energy
-        for battery in perception.batteries:
-            if remaining_demand <= 0:
-                break
-            power_used = battery.discharge(remaining_demand)
-            remaining_demand -= power_used
-        
-        # Then use power plants
-        for plant in perception.power_plants:
-            if remaining_demand <= 0:
-                break
-            power_generated = plant.generate_power(remaining_demand)
-            remaining_demand -= power_generated
-        
-        print(f"Energy demand: {self.total_demand} MW, Unmet: {remaining_demand} MW")
-
-class EnergyPerception(AgentPerception):
-    """Perception of energy system state."""
-    power_plants: list[PowerPlant]
-    batteries: list[Battery]
-    total_capacity: float
-    
     @classmethod
-    def get_information_from_environment(cls, agent: EnergyManager, environment: Environment) -> dict:
-        power_plants = [
-            asset for asset in environment.assets.values()
-            if isinstance(asset, PowerPlant)
-        ]
-        batteries = [
-            asset for asset in environment.assets.values()
-            if isinstance(asset, Battery)
-        ]
+    def trigger(cls, agent: Any, perception: TemperaturePerception) -> "DrinkChoice":
+        """Trigger the choice set based on the agent's perception.
         
-        total_capacity = sum(p.capacity for p in power_plants)
-        
-        return {
-            "power_plants": power_plants,
-            "batteries": batteries,
-            "total_capacity": total_capacity
+        Args:
+            agent: The agent making the choice.
+            perception: The agent's perception of the environment.
+
+        Returns:
+            An instance of the DrinkChoice class.
+        """
+        options = ["hot chocolate", "iced tea"]
+        return cls( 
+            options=options,
+            agent=agent,
+            temperature=perception.temperature
+        )
+    
+    def evaluate(self):
+        """Create evaluation score for each drink option"""
+        self.scores = {
+            o: (
+                self.agent.drink_preference[o] 
+                + self.agent.temperature_adjustment[o] * self.temperature
+            ) 
+            for o in self.options
         }
-    
-    def distort_information(self, agent: EnergyManager) -> None:
-        """No distortion in this example."""
-        pass
-
-class EnergyChoiceSet(ChoiceSet):
-    """Choices for energy management."""
-    strategy: str = "cost_minimization"
-    
-    @classmethod
-    def trigger(cls, agent: EnergyManager, perception: EnergyPerception) -> "EnergyChoiceSet":
-        return cls()
-    
-    def evaluate(self) -> None:
-        """Evaluate energy management strategies."""
-        pass
 ```
 
-## Tips for Building Your Own Models
+### Step 5: Define Agent
 
-### 1. Start Simple
+The agent ties everything together with its attributes and decision-making logic:
+
+```python
+class Person(Agent):
+    drink_preference: dict[str, float] = Field(
+        ...,
+        description="Score for each drink option at zero degree Celsius"
+    )
+    temperature_adjustment: dict[str, float] = Field(
+        ..., 
+        description="Adjustment factor for drink preference based on temperature"
+    )
+    temperature_bias: float = Field(
+        0.0, description="Bias in temperature perception (e.g., due to clothing)"
+    )
+
+    def perceive(self, environment: Environment) -> TemperaturePerception:
+        return TemperaturePerception.perceive(self, environment)
+    
+    def trigger_choice(self, perception: TemperaturePerception):
+        return DrinkChoice.trigger(agent=self, perception=perception)
+    
+    def choose(self, options: Any, perception: Any):
+        best_option = max(options.scores, key=options.scores.get)
+        print(
+            f"{self.id}: It is {perception.temperature} of felt temperature!"
+            f"I drink: {best_option}"
+        )
+```
+
+### Step 6: Run the Simulation
+
+```python
+# Create environment and agent
+my_env = TemperatureEnvironment()
+me = Person(
+    id="Alice",
+    drink_preference={"hot chocolate": 20.0, "iced tea": 0},
+    temperature_adjustment={"hot chocolate": -1, "iced tea": 1},
+    temperature_bias=2.0
+)
+my_env.add(me)
+
+# Run simulation for 20 steps
+for i in range(20):
+    print(f"\n--- Simulation step {i+1} ---")
+    my_env.step()
+```
+
+This will produce output like:
+```
+--- Simulation step 1 ---
+2020: Environment temperature changed to: 38
+Person.Alice: It is 40.0 of felt temperature!I drink: iced tea
+
+--- Simulation step 2 ---
+2021: Environment temperature changed to: 6
+Person.Alice: It is 8.0 of felt temperature!I drink: hot chocolate
+```
+
+## Key Framework Concepts
+
+### Understanding the Framework Structure
+
+The temperature example above demonstrates the four core components of the COSI Consumer Framework:
+
+1. **Environment**: Holds the objective state of the world and coordinates agent interactions
+2. **Perception**: How agents extract and potentially distort information from the environment  
+3. **Choice Set**: The options available to agents and how they're evaluated
+4. **Agent**: The decision-making entity that perceives, evaluates choices, and acts
+
+### The Agent Decision Cycle
+
+Each simulation step follows this pattern:
+1. **Perceive**: Agent extracts information from environment and applies personal biases
+2. **Trigger**: Agent determines what choices are available based on perception
+3. **Evaluate**: Agent scores the available options  
+4. **Choose**: Agent selects and executes the best option
+
+### Tips for Building Your Own Models
+
+#### Start Simple
 Begin with basic agent behaviors and gradually add complexity:
 
 ```python
@@ -406,69 +214,46 @@ class SimpleAgent(Agent):
         pass
 ```
 
-### 2. Use Composition
-Build complex behaviors by combining simple components:
-
-```python
-class ComplexAgent(Agent):
-    """Combine multiple behaviors."""
-    financial_behavior: FinancialBehavior
-    social_behavior: SocialBehavior
-    
-    def choose(self, options, perception):
-        # Combine insights from different behaviors
-        financial_score = self.financial_behavior.evaluate(options)
-        social_score = self.social_behavior.evaluate(options)
-        # Make decision based on combined scores
-```
-
-### 3. Test Components Separately
+#### Test Components Separately
 Test perception, choice sets, and decision-making independently:
 
 ```python
 def test_perception():
-    env = Environment()
-    agent = MyAgent(id="test")
+    env = TemperatureEnvironment()
+    agent = Person(id="test", drink_preference={"hot chocolate": 10, "iced tea": 5}, 
+                   temperature_adjustment={"hot chocolate": -1, "iced tea": 1})
     env.add(agent)
     
     perception = agent.perceive(env)
-    assert perception.some_property == expected_value
+    assert perception.temperature == env.temperature + agent.temperature_bias
 
 def test_choice_set():
-    perception = MyPerception(...)
-    choices = MyChoiceSet.trigger(agent, perception)
-    assert len(choices.options) > 0
+    perception = TemperaturePerception(temperature=25)
+    agent = Person(id="test", drink_preference={"hot chocolate": 10, "iced tea": 5},
+                   temperature_adjustment={"hot chocolate": -1, "iced tea": 1})
+    choices = DrinkChoice.trigger(agent, perception)
+    assert len(choices.options) == 2
 ```
 
-### 4. Use Meaningful Metrics
-Implement comprehensive reporting to understand your model:
-
-```python
-class MyAgent(Agent):
-    def report(self):
-        report = super().report()
-        report[self.class_name].update({
-            "efficiency": self.calculate_efficiency(),
-            "satisfaction": self.calculate_satisfaction(),
-            "interactions": self.interaction_count
-        })
-        return report
-```
-
-### 5. Handle Edge Cases
-Always consider boundary conditions:
+#### Handle Edge Cases
+Always consider boundary conditions and validate your model logic:
 
 ```python
 def choose(self, options, perception):
-    if not options.available_options:
+    if not options.options:
         # Handle case with no options
+        print(f"{self.id}: No drink options available!")
         return
     
-    if self.budget <= 0:
-        # Handle case with no resources
+    options.evaluate()
+    if not options.scores:
+        # Handle case where evaluation failed
+        print(f"{self.id}: Could not evaluate options!")
         return
     
     # Normal decision-making logic
+    best_option = max(options.scores, key=options.scores.get)
+    print(f"{self.id}: Choosing {best_option}")
 ```
 
-These examples demonstrate the flexibility and power of the COSI Consumer Framework for building agent-based models across various domains.
+This simple but complete example demonstrates the power and flexibility of the COSI Consumer Framework for building agent-based models. You can extend this pattern to model complex systems across various domains by adding more sophisticated environments, perception mechanisms, and decision-making logic.

@@ -36,54 +36,6 @@ cd cosi_consumer_framework
 pip install -e .
 ```
 
-### Basic Usage
-
-```python
-import numpy as np
-from cosi_consumer_framework import (
-    Environment, 
-    Agent, 
-    Asset, 
-    AgentPerception, 
-    ChoiceSet
-)
-
-# Create an environment
-env = Environment(year=2024)
-
-# Define your agent class
-class Person(Agent):
-    wealth: int = 1
-    
-    def perceive(self, environment):
-        # Implement perception logic
-        pass
-    
-    def trigger_choice(self, perception):
-        # Implement choice triggering logic
-        pass
-    
-    def choose(self, options, perception):
-        # Implement decision-making logic
-        pass
-
-# Create and add agents to the environment
-person1 = Person(id="person_1")
-person2 = Person(id="person_2")
-env.add([person1, person2])
-
-# Run simulation steps
-for step in range(10):
-    env.step()
-
-# Access results
-reports = env.reports
-```
-
-### Example: Simple Wealth Transfer Model
-
-See the complete example in the [Examples & Tutorials](examples.md) section for a detailed walkthrough of building a simple model where agents transfer wealth between each other.
-
 ## Requirements
 
 - Python >= 3.13
