@@ -4,6 +4,7 @@ from .object_registry import ObjectRegistry
 from .asset import Asset
 from .agent_perception import AgentPerception
 from .environment import Environment
+from .consumer_model import ConsumerModel
 from .choice_set import ChoiceSet
 
 
@@ -14,5 +15,6 @@ __all__ = [
     "Asset",
     "AgentPerception",
     "Environment",
+    "ConsumerModel",
     "ChoiceSet",
 ]

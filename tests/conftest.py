@@ -1,27 +1,41 @@
 import pytest
-from cosi_consumer_framework import Asset, Agent, ChoiceSet
+from cosi_consumer_framework import Asset, Agent, AgentPerception, ChoiceSet
 
 
 class SampleAsset(Asset):
     pass
 
 
-class SampleAgent(Agent):
-    def perceive(self, environment):
-        pass
-
-    def trigger_choice(self, perception):
-        pass
-
-    def choose(self, options, perception):
+class SamplePerception(AgentPerception):
+    """Minimal perception for testing."""
+    
+    @classmethod
+    def get_information_from_environment(cls, agent, environment):
+        return {}
+    
+    def distort_information(self, agent):
         pass
 
 
 class SampleChoiceSet(ChoiceSet):
-    def trigger(self, perception):
+    """Minimal choice set for testing."""
+    
+    @classmethod
+    def trigger(cls, agent, perception):
+        return cls()
+    
+    def evaluate(self):
         pass
 
-    def evaluate(self):
+
+class SampleAgent(Agent):
+    def perceive(self, environment):
+        return SamplePerception.perceive(self, environment)
+
+    def trigger_choice(self, perception):
+        return SampleChoiceSet.trigger(self, perception)
+
+    def choose(self, options, perception):
         pass
 
 
