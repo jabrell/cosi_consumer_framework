@@ -7,8 +7,10 @@ from .conftest import SampleAgent, SampleAsset
 def test_environment_only_accepts_assets(agent1: SampleAgent):
     """Test that environment only accepts assets, not agents."""
     env = Environment()
-    
-    with pytest.raises(TypeError, match="Expected Asset.*Agents should be added to ConsumerModel"):
+
+    with pytest.raises(
+        TypeError, match="Expected Asset.*Agents should be added to ConsumerModel"
+    ):
         env.add(agent1)
 
 
@@ -18,11 +20,12 @@ def test_dependency_check():
 
     class House(Asset):
         """A sample house"""
+
         pass
 
     house = House(id="house1")
     env.add(house)
-    
+
     # Test with wrong id type
     class HeatingSystem(Asset):
         house_id: str
@@ -30,11 +33,11 @@ def test_dependency_check():
     heating_system = HeatingSystem(id="heating1", house_id=house.id[:-2])
     with pytest.raises(ValueError):
         env._check_references(heating_system)
-    
+
     # With the correct id, it should pass
     heating_system.house_id = house.id
     env._check_references(heating_system)
-    
+
     # Clean up
     heating_system.destroy()
     house.destroy()
@@ -166,10 +169,10 @@ def test_delete_already_deleted_object(asset1: SampleAsset):
 def test_add_nested_lists(asset_list: list[SampleAsset]):
     """Test that nested lists of assets can be added using the add method."""
     env = Environment()
-    
+
     # Create a second list for nesting
     asset_list2 = [SampleAsset(id=f"nested_obj{i}") for i in range(3)]
-    
+
     nested_objects = [asset_list, asset_list2]
     env.add(nested_objects)
 
@@ -177,7 +180,7 @@ def test_add_nested_lists(asset_list: list[SampleAsset]):
         assert env.is_in(asset)
     for asset in asset_list2:
         assert env.is_in(asset)
-    
+
     # Clean up
     for asset in asset_list2:
         asset.destroy()
@@ -186,10 +189,10 @@ def test_add_nested_lists(asset_list: list[SampleAsset]):
 def test_delete_nested_lists(asset_list: list[SampleAsset]):
     """Test that nested lists of assets can be deleted using the delete method."""
     env = Environment()
-    
+
     # Create a second list for nesting
     asset_list2 = [SampleAsset(id=f"nested_obj{i}") for i in range(3)]
-    
+
     nested_objects = [asset_list, asset_list2]
     env.add(nested_objects)
 
@@ -207,7 +210,7 @@ def test_delete_nested_lists(asset_list: list[SampleAsset]):
         assert not env.is_in(asset)
     for asset in asset_list2:
         assert not env.is_in(asset)
-    
+
     # Clean up
     for asset in asset_list2:
         asset.destroy()

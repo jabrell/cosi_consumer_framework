@@ -8,22 +8,22 @@ class SampleAsset(Asset):
 
 class SamplePerception(AgentPerception):
     """Minimal perception for testing."""
-    
+
     @classmethod
     def get_information_from_environment(cls, agent, environment):
         return {}
-    
+
     def distort_information(self, agent):
         pass
 
 
 class SampleChoiceSet(ChoiceSet):
     """Minimal choice set for testing."""
-    
+
     @classmethod
     def trigger(cls, agent, perception):
         return cls()
-    
+
     def evaluate(self):
         pass
 
