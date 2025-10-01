@@ -1,4 +1,4 @@
-# COSI Consumer Framework
+<img width="1462" height="527" alt="overview_of_model_framework" src="https://github.com/user-attachments/assets/d5df0b31-3afd-45cb-a3fd-3f565c2baac9" /># COSI Consumer Framework
 
 An agent-based modeling framework for consumer behavior simulation, implementing the SWEET COSI Framework in Python.
 
@@ -11,8 +11,8 @@ The COSI Consumer Framework provides a structured approach to building agent-bas
 - Agents make choices based on perceptions, preferences, and environmental conditions
 
 The architecture of this frame:
-- add figure here
-- 
+<img width="1462" height="527" alt="overview_of_model_framework" src="https://github.com/user-attachments/assets/67e9b6cf-0bd4-46e5-9d51-c6e5623dbc34" />
+
 ## Installation
 
 This project uses [uv](https://docs.astral.sh/uv/) for Python package management.
