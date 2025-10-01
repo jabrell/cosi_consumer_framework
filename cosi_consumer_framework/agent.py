@@ -60,7 +60,7 @@ class Agent(Registrable, ABC):
     @abstractmethod
     def choose(self, options: Any, perception: Any) -> None:
         """Make a choice based on the available options. This requires that agent
-        has evaluated the options in the choice set. cpThis is typically done
+        has evaluated the options in the choice set. This is typically done
         automatically in the pre-defined step method.
 
         Args:
