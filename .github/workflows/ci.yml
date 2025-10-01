@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+
+    - name: Set up Python 3.13
+      run: uv python install 3.13
+
+    - name: Install dependencies
+      run: uv sync --all-extras --dev
+
+    - name: Run tests with coverage
+      run: |
+        uv run pytest --cov=cosi_consumer_framework --cov-report=xml --cov-report=term -v
+
+    - name: Generate coverage report
+      if: github.event_name == 'pull_request'
+      run: |
+        uv run pytest --cov=cosi_consumer_framework --cov-report=term | tee coverage-output.txt
+        COVERAGE=$(grep "TOTAL" coverage-output.txt | awk '{print $NF}')
+        echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+    - name: Comment PR with test results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          
+          // Read test output
+          let coverageOutput = '';
+          try {
+            coverageOutput = fs.readFileSync('coverage-output.txt', 'utf8');
+          } catch (error) {
+            coverageOutput = 'Coverage report not available';
+          }
+          
+          const coverage = process.env.COVERAGE || 'N/A';
+          
+          const body = `## Test Results
+          
+          **Python Version**: 3.13
+          **Coverage**: ${coverage}
+          
+          <details>
+          <summary>Coverage Details</summary>
+          
+          \`\`\`
+          ${coverageOutput}
+          \`\`\`
+          
+          </details>
+          
+          ### Status: ✅ All tests passed
+          
+          **Commit**: ${{ github.event.pull_request.head.sha }}
+          **Workflow**: [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          `;
+          
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('## Test Results')
+          );
+          
+          // Update or create comment
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }

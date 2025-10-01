@@ -10,8 +10,9 @@ The COSI Consumer Framework provides a structured approach to building agent-bas
 - **ConsumerModel** model implementation
 - Agents make choices based on perceptions, preferences, and environmental conditions
 
-The architecture of this frame
-
+The architecture of this frame:
+- add figure here
+- 
 ## Installation
 
 This project uses [uv](https://docs.astral.sh/uv/) for Python package management.
