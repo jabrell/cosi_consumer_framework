@@ -1,4 +1,4 @@
-<img width="1462" height="527" alt="overview_of_model_framework" src="https://github.com/user-attachments/assets/d5df0b31-3afd-45cb-a3fd-3f565c2baac9" /># COSI Consumer Framework
+# COSI Consumer Framework
 
 An agent-based modeling framework for consumer behavior simulation, implementing the SWEET COSI Framework in Python.
 
