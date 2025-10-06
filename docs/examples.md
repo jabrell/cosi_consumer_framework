@@ -4,7 +4,13 @@ This guide provides practical examples of how to use the COSI Consumer Framework
 
 ## Basic Usage Example: Temperature-Based Drink Choice
 
-This example demonstrates the basic concepts of the framework through a simple model where agents choose drinks based on temperature.  IMPORTANT: Agents are no longer stored inside the `Environment`. Instead, a `ConsumerModel` orchestrates the simulation and owns the collection of agents while holding a reference to the environment.
+This example demonstrates the basic concepts of the framework through a simple model 
+where agents choose drinks based on temperature. 
+
+The `ConsumerModel` holds key components that interact with each other:
+1. The `Environment` is the source of truth where all information and assets are living.
+2. The `Agent` interacts with the environment by perceiving and communication information.
+
 
 ### Step 1: Setup and Imports
 
@@ -28,7 +34,8 @@ from cosi_consumer_framework import (
 
 ### Step 2: Define Environment
 
-The environment holds all objective information about the world (state, assets, etc.). It no longer stores or manages agents. The simulation loop and agent orchestration are handled by `ConsumerModel`. Here we create a temperature environment that randomly changes temperature each year:
+The environment holds all objective information about the world (state, assets, etc.). 
+Here we create a temperature environment that randomly changes temperature each year:
 
 ```python
 class TemperatureEnvironment(Environment):
