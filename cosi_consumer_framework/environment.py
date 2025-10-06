@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Any
 
 from .asset import Asset
-from .agent import Agent
 from .object_registry import ObjectRegistry
 from .registrable import Registrable
 
@@ -10,7 +9,9 @@ __all__ = ["Environment"]
 
 
 class Environment:
-    """The environment in which households are embedded."""
+    """The environment contains assets and provides context for agents to perceive and act upon.
+    Agents are NOT part of the environment - they exist externally and interact with it.
+    """
 
     def __init__(
         self,
@@ -24,14 +25,13 @@ class Environment:
         """
         self._year = year
 
-        # single registry for all objects
+        # single registry for assets only
         self._object_registry: ObjectRegistry[Registrable] = ObjectRegistry()
 
-        # track classnames of agents and assets
-        self._agent_classnames: set[str] = set()
+        # track classnames of assets
         self._asset_classnames: set[str] = set()
 
-        # reports are used to store the reports of the assets and agents for each
+        # reports are used to store the reports of the assets for each
         # step of the simulation
         # the report is stored as a dictionary with the object id as and a list
         # of dictionaries containing the report data
@@ -55,17 +55,8 @@ class Environment:
         return assets
 
     @property
-    def agents(self) -> dict[str, Registrable]:
-        """Dictionary of all registered agents in the environment with their
-        IDs as keys."""
-        agents = {}
-        for class_name in self._agent_classnames:
-            agents.update(self._object_registry._objects_by_class.get(class_name, {}))
-        return agents
-
-    @property
     def reports(self) -> dict[str, list[dict[str, Any]]]:
-        """Get the reports of all registered objects in the environment.
+        """Get the reports of all registered assets in the environment.
 
         Returns:
             A dictionary with object IDs as keys and lists of dictionaries
@@ -74,14 +65,11 @@ class Environment:
         """
         return dict(self._reports)
 
-    def add(
-        self, objects: Asset | Agent | list[Asset | Agent] | list[list[Asset | Agent]]
-    ):
-        """Register objects (assets or agents) within the environment.
+    def add(self, objects: Asset | list[Asset] | list[list[Asset]]):
+        """Register assets within the environment.
 
         Args:
-            objects: A single object, list of objects, or nested list of objects to be registered.
-                    Can be assets, agents, or a mix of both.
+            objects: A single asset, list of assets, or nested list of assets to be registered.
         """
         # Flatten nested lists
         if isinstance(objects, list) and objects and isinstance(objects[0], list):
@@ -94,9 +82,10 @@ class Environment:
             objects = [objects]
 
         for obj in objects:
-            if not isinstance(obj, (Asset, Agent)):
+            if not isinstance(obj, Asset):
                 raise TypeError(
-                    f"Expected Asset or Agent, got {type(obj).__name__} instead."
+                    f"Expected Asset, got {type(obj).__name__} instead. "
+                    f"Agents should be added to ConsumerModel, not Environment."
                 )
 
             # check for dependencies
@@ -106,24 +95,18 @@ class Environment:
             self._object_registry.add(obj)
 
             # track classnames
-            if isinstance(obj, Asset):
-                self._asset_classnames.add(obj.__class__.__name__)
-            elif isinstance(obj, Agent):
-                self._agent_classnames.add(obj.__class__.__name__)
+            self._asset_classnames.add(obj.__class__.__name__)
 
-    def delete(
-        self, objects: Asset | Agent | list[Asset | Agent] | list[list[Asset | Agent]]
-    ):
-        """Delete objects (assets or agents) from the environment.
+    def delete(self, objects: Asset | list[Asset] | list[list[Asset]]):
+        """Delete assets from the environment.
 
         Args:
-            objects: A single object, list of objects, or nested list of objects to be deleted.
-                    Can be assets, agents, or a mix of both.
+            objects: A single asset, list of assets, or nested list of assets to be deleted.
         """
         # Flatten nested lists
-        objects_to_delete: list[Asset | Agent]
+        objects_to_delete: list[Asset]
         if isinstance(objects, list) and objects and isinstance(objects[0], list):
-            flattened: list[Agent | Asset] = []
+            flattened: list[Asset] = []
             for sublist in objects:
                 if isinstance(sublist, list):
                     flattened.extend(sublist)
@@ -136,50 +119,46 @@ class Environment:
         self._object_registry.delete(objects_to_delete)  # type: ignore
 
     def get(self, id: str) -> Any:
-        """Get an object (asset or agent) from the environment by ID.
+        """Get an asset from the environment by ID.
 
         Args:
-            id: The ID of the object to retrieve.
+            id: The ID of the asset to retrieve.
 
         Returns:
-            The object with the specified ID, or None if not found.
+            The asset with the specified ID, or None if not found.
         """
         return self._object_registry.get_item(id)
 
     def is_in(self, obj: Registrable | str) -> bool:
-        """Check if an object is registered in the environment.
+        """Check if an asset is registered in the environment.
 
         Args:
-            obj: The object to check, can be an Asset, Agent, or a string representing the id.
+            obj: The asset to check, can be an Asset or a string representing the id.
 
         Returns:
-            True if the object is registered, False otherwise.
+            True if the asset is registered, False otherwise.
         """
         return self._object_registry.object_is_registered(obj)
 
     def get_list(self, class_name: str | type | None = None) -> list[Any]:
-        """Get all registered objects of a certain type.
+        """Get all registered assets of a certain type.
 
         Args:
-            class_name: The class name of the objects to retrieve.
+            class_name: The class name of the assets to retrieve.
 
         Returns:
-            A list of all registered objects of the specified type.
+            A list of all registered assets of the specified type.
         """
         if class_name is None:
-            return list(self.assets.values()) + list(self.agents.values())
+            return list(self.assets.values())
         return self._object_registry.list_objects(class_name)
 
-    def step(self):
-        """Advance the environment by one year."""
-        for a in self.agents.values():
-            a.act(environment=self)
-        self.report()
-
+    def advance_time(self):
+        """Advance the environment's time by one year."""
         self._year += 1
 
     def report(self) -> None:
-        # do the reporting
+        """Generate reports for all assets that have reporting enabled."""
         all_reporters: list[Registrable] = [
             r for r in self.get_list() if r.is_reporting
         ]
@@ -199,9 +178,6 @@ class Environment:
         are public attributes, i.e., not starting with an underscore. The dependency
         id has to be a qualified id, i.e., the class name and the id of the object
         (e.g., MyBuilding.1).
-
-        Currently, we only allow to references to assets, i.e., references to agents
-        will raise an error.
 
         Args:
             obj: The object to check for dependencies.

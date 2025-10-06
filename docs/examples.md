@@ -4,7 +4,13 @@ This guide provides practical examples of how to use the COSI Consumer Framework
 
 ## Basic Usage Example: Temperature-Based Drink Choice
 
-This example demonstrates the basic concepts of the framework through a simple model where agents choose drinks based on temperature.
+This example demonstrates the basic concepts of the framework through a simple model 
+where agents choose drinks based on temperature. 
+
+The `ConsumerModel` holds key components that interact with each other:
+1. The `Environment` is the source of truth where all information and assets are living.
+2. The `Agent` interacts with the environment by perceiving and communication information.
+
 
 ### Step 1: Setup and Imports
 
@@ -18,25 +24,27 @@ import numpy as np
 from pydantic import Field
 
 from cosi_consumer_framework import (
-    Environment, 
-    Agent, 
-    AgentPerception, 
-    ChoiceSet
+    Environment,
+    ConsumerModel,
+    Agent,
+    AgentPerception,
+    ChoiceSet,
 )
 ```
 
 ### Step 2: Define Environment
 
-The environment holds all objective information and coordinates the simulation. Here we create a temperature environment that randomly changes temperature each year:
+The environment holds all objective information about the world (state, assets, etc.). 
+Here we create a temperature environment that randomly changes temperature each year:
 
 ```python
 class TemperatureEnvironment(Environment):
     temperature: float = Field(15.0, description="Current temperature in degrees Celsius")
 
-    def step(self):
-        self.temperature = np.random.randint(0,40)
+    def update_temperature(self):
+        """Randomly update temperature for the current year."""
+        self.temperature = np.random.randint(0, 40)
         print(f"{self.year}: Environment temperature changed to: {self.temperature}")
-        super().step()
 ```
 
 ### Step 3: Define Perception
@@ -146,54 +154,72 @@ class Person(Agent):
         )
 ```
 
-### Step 6: Run the Simulation
+### Step 6: Build the Model & Run the Simulation
+
+With the refactoring, agents are registered on a `ConsumerModel` which also holds the environment. The environment is updated externally (e.g. temperature) before each model `step()` so agents act on the latest state.
 
 ```python
-# Create environment and agent
-my_env = TemperatureEnvironment()
-me = Person(
+import logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+# Create environment
+my_env = TemperatureEnvironment(year=2020)
+
+# Create the consumer model with the environment
+model = ConsumerModel(environment=my_env)
+
+# Create an agent
+alice = Person(
     id="Alice",
     drink_preference={"hot chocolate": 20.0, "iced tea": 0},
     temperature_adjustment={"hot chocolate": -1, "iced tea": 1},
-    temperature_bias=2.0
+    temperature_bias=2.0,
 )
-my_env.add(me)
+
+# Register agent with the model (NOT the environment)
+model.add_agents(alice)
 
 # Run simulation for 20 steps
 for i in range(20):
-    print(f"\n--- Simulation step {i+1} ---")
-    my_env.step()
+    logging.info(f"\n--- Simulation step {i+1} ---")
+    # Update environment before agents act
+    my_env.update_temperature()
+    # Agents perceive, choose, act; reports generated; time advances
+    model.step()
 ```
 
-This will produce output like:
+Representative output (abridged):
 ```
 --- Simulation step 1 ---
 2020: Environment temperature changed to: 38
-Person.Alice: It is 40.0 of felt temperature!I drink: iced tea
+Alice: It is 40.0°C of felt temperature! I drink: iced tea
 
 --- Simulation step 2 ---
 2021: Environment temperature changed to: 6
-Person.Alice: It is 8.0 of felt temperature!I drink: hot chocolate
+Alice: It is 8.0°C of felt temperature! I drink: hot chocolate
 ```
 
 ## Key Framework Concepts
 
 ### Understanding the Framework Structure
 
-The temperature example above demonstrates the four core components of the COSI Consumer Framework:
+The temperature example above demonstrates the core components of the COSI Consumer Framework after the refactor:
 
-1. **Environment**: Holds the objective state of the world and coordinates agent interactions
-2. **Perception**: How agents extract and potentially distort information from the environment  
-3. **Choice Set**: The options available to agents and how they're evaluated
-4. **Agent**: The decision-making entity that perceives, evaluates choices, and acts
+1. **Environment**: Holds the objective state of the world (no longer stores agents)
+2. **ConsumerModel**: Orchestrates the simulation; owns agents and a reference to the environment
+3. **Perception**: How agents extract and potentially distort information from the environment
+4. **Choice Set**: The options available to agents and how they're evaluated
+5. **Agent**: The decision-making entity that perceives, evaluates choices, and acts
 
 ### The Agent Decision Cycle
 
-Each simulation step follows this pattern:
-1. **Perceive**: Agent extracts information from environment and applies personal biases
-2. **Trigger**: Agent determines what choices are available based on perception
-3. **Evaluate**: Agent scores the available options  
-4. **Choose**: Agent selects and executes the best option
+Each model `step()` now follows this pattern:
+1. (Optional) External updates to environment state (e.g. `update_temperature()`)
+2. **Perceive**: Each agent extracts info and applies personal biases
+3. **Trigger**: Agent determines available choices from perception
+4. **Evaluate**: Agent/ChoiceSet scores options
+5. **Choose/Act**: Agent selects and acts
+6. **Report & Time Advance**: Model collects reports and advances environment time
 
 ### Tips for Building Your Own Models
 
@@ -219,18 +245,22 @@ Test perception, choice sets, and decision-making independently:
 
 ```python
 def test_perception():
-    env = TemperatureEnvironment()
-    agent = Person(id="test", drink_preference={"hot chocolate": 10, "iced tea": 5}, 
-                   temperature_adjustment={"hot chocolate": -1, "iced tea": 1})
-    env.add(agent)
-    
+    env = TemperatureEnvironment(year=2020)
+    model = ConsumerModel(environment=env)
+    agent = Person(id="test", drink_preference={"hot chocolate": 10, "iced tea": 5},
+                   temperature_adjustment={"hot chocolate": -1, "iced tea": 1},
+                   temperature_bias=2)
+    model.add_agents(agent)
+
+    env.temperature = 10
     perception = agent.perceive(env)
-    assert perception.temperature == env.temperature + agent.temperature_bias
+    assert perception.temperature == 10 + agent.temperature_bias
 
 def test_choice_set():
     perception = TemperaturePerception(temperature=25)
     agent = Person(id="test", drink_preference={"hot chocolate": 10, "iced tea": 5},
-                   temperature_adjustment={"hot chocolate": -1, "iced tea": 1})
+                   temperature_adjustment={"hot chocolate": -1, "iced tea": 1},
+                   temperature_bias=0)
     choices = DrinkChoice.trigger(agent, perception)
     assert len(choices.options) == 2
 ```
