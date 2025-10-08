@@ -43,12 +43,6 @@ source .venv/bin/activate  # On Unix/macOS
 .venv\Scripts\activate  # On Windows
 ```
 
-## Examples
-
-See the `examples/` directory for complete working examples:
-
-- `0_basic_usage.ipynb` - Basic agent-based model with temperature and drink choices
-
 
 ## Running Tests
 Running tests using `uv`.
